@@ -3,7 +3,7 @@
     package="com.nguyenhoanglam.imagepicker.test" >
 
     <uses-sdk
-        android:minSdkVersion="15"
+        android:minSdkVersion="16"
         android:targetSdkVersion="24" />
 
     <instrumentation
@@ -32,7 +32,7 @@
 
         <provider
             android:name="android.support.v4.content.FileProvider"
-            android:authorities="@string/shared_file_provider"
+            android:authorities="com.nguyenhoanglam.imagepicker.test.provider"
             android:exported="false"
             android:grantUriPermissions="true" >
             <meta-data
