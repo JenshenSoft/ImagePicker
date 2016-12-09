@@ -19,6 +19,7 @@ import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresPermission;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
@@ -52,16 +53,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created by hoanglam on 7/31/16.
- */
 public class ImagePickerActivity extends AppCompatActivity implements OnImageClickListener {
 
-    private static final String TAG = "ImagePickerActivity";
-
-    public static final int MODE_SINGLE = 1;
-    public static final int MODE_MULTIPLE = 2;
-
+    public static final int MODE_SINGLE_GALLERY = 1;
+    public static final int MODE_MULTIPLE_GALLERY = 2;
+    @RequiresPermission(Manifest.permission.CAMERA)
+    public static final int MODE_CAMERA = 3;
     public static final String INTENT_EXTRA_SELECTED_IMAGES = "selectedImages";
     public static final String INTENT_EXTRA_LIMIT = "limit";
     public static final String INTENT_EXTRA_SHOW_CAMERA = "showCamera";
@@ -70,46 +67,35 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
     public static final String INTENT_EXTRA_FOLDER_TITLE = "folderTitle";
     public static final String INTENT_EXTRA_IMAGE_TITLE = "imageTitle";
     public static final String INTENT_EXTRA_IMAGE_DIRECTORY = "imageDirectory";
-
-
+    private static final String TAG = "ImagePickerActivity";
+    private final int menuDoneId = 100;
+    private final int menuCameraId = 101;
+    private final String[] projection = new String[]{MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.DATA, MediaStore.Images.Media.BUCKET_DISPLAY_NAME};
     private List<Folder> folders;
     private ArrayList<Image> images;
     private String currentImagePath;
     private String imageDirectory;
-
     private ArrayList<Image> selectedImages;
     private boolean showCamera;
     private int mode;
     private boolean folderMode;
     private int limit;
     private String folderTitle, imageTitle;
-
     private ActionBar actionBar;
-
     private MenuItem menuDone, menuCamera;
-    private final int menuDoneId = 100;
-    private final int menuCameraId = 101;
-
     private RelativeLayout mainLayout;
     private ProgressWheel progressBar;
     private TextView emptyTextView;
     private RecyclerView recyclerView;
-
     private GridLayoutManager layoutManager;
     private GridSpacingItemDecoration itemOffsetDecoration;
-
     private int imageColumns;
     private int folderColumns;
-
     private ImagePickerAdapter imageAdapter;
     private FolderPickerAdapter folderAdapter;
-
     private ContentObserver observer;
     private Handler handler;
     private Thread thread;
-
-    private final String[] projection = new String[]{MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.DATA, MediaStore.Images.Media.BUCKET_DISPLAY_NAME};
-
     private Parcelable foldersState;
 
 
@@ -138,9 +124,9 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
             actionBar.setDisplayShowTitleEnabled(true);
         }
 
-        /** Get extras */
+        /* Get extras */
         limit = intent.getIntExtra(ImagePickerActivity.INTENT_EXTRA_LIMIT, Constants.MAX_LIMIT);
-        mode = intent.getIntExtra(ImagePickerActivity.INTENT_EXTRA_MODE, ImagePickerActivity.MODE_MULTIPLE);
+        mode = intent.getIntExtra(ImagePickerActivity.INTENT_EXTRA_MODE, ImagePickerActivity.MODE_MULTIPLE_GALLERY);
         folderMode = intent.getBooleanExtra(ImagePickerActivity.INTENT_EXTRA_FOLDER_MODE, false);
 
         if (intent.hasExtra(INTENT_EXTRA_FOLDER_TITLE)) {
@@ -161,7 +147,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         }
 
         showCamera = intent.getBooleanExtra(ImagePickerActivity.INTENT_EXTRA_SHOW_CAMERA, true);
-        if (mode == ImagePickerActivity.MODE_MULTIPLE && intent.hasExtra(ImagePickerActivity.INTENT_EXTRA_SELECTED_IMAGES)) {
+        if (mode == ImagePickerActivity.MODE_MULTIPLE_GALLERY && intent.hasExtra(ImagePickerActivity.INTENT_EXTRA_SELECTED_IMAGES)) {
             selectedImages = intent.getParcelableArrayListExtra(ImagePickerActivity.INTENT_EXTRA_SELECTED_IMAGES);
         }
         if (selectedImages == null)
@@ -169,12 +155,12 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         images = new ArrayList<>();
 
 
-        /** Set activity title */
+        /* Set activity title */
         if (actionBar != null) {
             actionBar.setTitle(folderMode ? folderTitle : imageTitle);
         }
 
-        /** Init folder and image adapter */
+        /* Init folder and image adapter */
         imageAdapter = new ImagePickerAdapter(this, images, selectedImages, this);
         folderAdapter = new FolderPickerAdapter(this, new OnFolderClickListener() {
             @Override
@@ -186,6 +172,9 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
 
         orientationBasedUI(getResources().getConfiguration().orientation);
 
+        if (mode == MODE_CAMERA) {
+            captureImage();
+        }
     }
 
     @Override
@@ -263,11 +252,11 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         if (id == menuDoneId) {
             if (selectedImages != null && selectedImages.size() > 0) {
 
-                /** Scan selected images which not existed */
+                /* Scan selected images which not existed */
                 for (int i = 0; i < selectedImages.size(); i++) {
                     Image image = selectedImages.get(i);
                     File file = new File(image.getPath());
-                    if (file == null || !file.exists()) {
+                    if (!file.exists()) {
                         selectedImages.remove(i);
                         i--;
                     }
@@ -358,7 +347,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             ActivityCompat.requestPermissions(this, permissions, Constants.PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE);
         } else {
-            if (isPermissionRequested(Constants.PREF_WRITE_EXTERNAL_STORAGE_REQUESTED) == false) {
+            if (!isPermissionRequested(Constants.PREF_WRITE_EXTERNAL_STORAGE_REQUESTED)) {
                 ActivityCompat.requestPermissions(this, permissions, Constants.PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE);
                 setPermissionRequested(Constants.PREF_WRITE_EXTERNAL_STORAGE_REQUESTED);
             } else {
@@ -385,7 +374,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
             ActivityCompat.requestPermissions(this, permissions, Constants.PERMISSION_REQUEST_CAMERA);
         } else {
-            if (isPermissionRequested(Constants.PREF_CAMERA_REQUESTED) == false) {
+            if (!isPermissionRequested(Constants.PREF_CAMERA_REQUESTED)) {
                 ActivityCompat.requestPermissions(this, permissions, Constants.PERMISSION_REQUEST_CAMERA);
                 setPermissionRequested(Constants.PREF_CAMERA_REQUESTED);
             } else {
@@ -454,7 +443,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putBoolean(permission, true);
-        editor.commit();
+        editor.apply();
     }
 
     /**
@@ -475,7 +464,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
      */
     private void clickImage(int position) {
         int selectedItemPosition = selectedImagePosition(images.get(position));
-        if (mode == ImagePickerActivity.MODE_MULTIPLE) {
+        if (mode == ImagePickerActivity.MODE_MULTIPLE_GALLERY) {
             if (selectedItemPosition == -1) {
                 if (selectedImages.size() < limit) {
                     imageAdapter.addSelected(images.get(position));
@@ -667,7 +656,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
                     if (menuDone != null)
                         menuDone.setVisible(false);
                 } else {
-                    if (mode == ImagePickerActivity.MODE_MULTIPLE) {
+                    if (mode == ImagePickerActivity.MODE_MULTIPLE_GALLERY) {
                         if (limit == Constants.MAX_LIMIT)
                             actionBar.setTitle(String.format(getString(R.string.selected), selectedImages.size()));
                         else
@@ -720,6 +709,32 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
             handler.removeCallbacksAndMessages(null);
             handler = null;
         }
+    }
+
+    /**
+     * Return folder base on folder name
+     */
+    public Folder getFolder(String name) {
+        for (Folder folder : folders) {
+            if (folder.getFolderName().equals(name)) {
+                return folder;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * When press back button, show folders if view is displaying images
+     */
+    @Override
+    public void onBackPressed() {
+        if (folderMode && !isDisplayingFolderView()) {
+            setFolderAdapter();
+            return;
+        }
+
+        setResult(RESULT_CANCELED);
+        super.onBackPressed();
     }
 
     /**
@@ -806,31 +821,5 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
             Thread.interrupted();
 
         }
-    }
-
-    /**
-     * Return folder base on folder name
-     */
-    public Folder getFolder(String name) {
-        for (Folder folder : folders) {
-            if (folder.getFolderName().equals(name)) {
-                return folder;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * When press back button, show folders if view is displaying images
-     */
-    @Override
-    public void onBackPressed() {
-        if (folderMode && !isDisplayingFolderView()) {
-            setFolderAdapter();
-            return;
-        }
-
-        setResult(RESULT_CANCELED);
-        super.onBackPressed();
     }
 }

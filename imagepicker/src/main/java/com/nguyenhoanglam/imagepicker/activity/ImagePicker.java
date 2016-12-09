@@ -5,8 +5,10 @@
 
 package com.nguyenhoanglam.imagepicker.activity;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.support.annotation.RequiresPermission;
 import android.support.v4.app.Fragment;
 
 import com.nguyenhoanglam.imagepicker.R;
@@ -65,7 +67,7 @@ public abstract class ImagePicker {
 
 
     public void init(Activity activity) {
-        this.mode = ImagePickerActivity.MODE_MULTIPLE;
+        this.mode = ImagePickerActivity.MODE_MULTIPLE_GALLERY;
         this.limit = Constants.MAX_LIMIT;
         this.showCamera = true;
         this.folderTitle = activity.getString(R.string.title_folder);
@@ -84,13 +86,19 @@ public abstract class ImagePicker {
         return new ImagePickerWithFragment(fragment);
     }
 
-    public ImagePicker single() {
-        mode = ImagePickerActivity.MODE_SINGLE;
+    public ImagePicker singleGalleryMode() {
+        mode = ImagePickerActivity.MODE_SINGLE_GALLERY;
         return this;
     }
 
-    public ImagePicker multi() {
-        mode = ImagePickerActivity.MODE_MULTIPLE;
+    public ImagePicker multiGalleryMode() {
+        mode = ImagePickerActivity.MODE_MULTIPLE_GALLERY;
+        return this;
+    }
+
+    @RequiresPermission(Manifest.permission.CAMERA)
+    public ImagePicker cameraMode() {
+        mode = ImagePickerActivity.MODE_CAMERA;
         return this;
     }
 
