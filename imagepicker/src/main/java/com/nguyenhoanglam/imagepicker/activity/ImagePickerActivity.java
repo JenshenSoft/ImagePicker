@@ -505,7 +505,7 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == Constants.REQUEST_CODE_CAPTURE) {
-            if (resultCode == RESULT_OK) {
+            if (resultCode == RESULT_OK && currentImagePath != null) {
                 Uri imageUri = Uri.parse(currentImagePath);
                 if (imageUri != null) {
                     MediaScannerConnection.scanFile(this,
@@ -548,7 +548,8 @@ public class ImagePickerActivity extends AppCompatActivity implements OnImageCli
         if (intent.resolveActivity(getPackageManager()) != null) {
             File imageFile = ImageUtils.createImageFile(imageDirectory);
             if (imageFile != null) {
-                Uri uri = FileProvider.getUriForFile(this, getString(R.string.shared_file_provider), imageFile);
+                String authority = getPackageName() + ".fileprovider";
+                Uri uri = FileProvider.getUriForFile(this, authority, imageFile);
                 currentImagePath = "file:" + imageFile.getAbsolutePath();
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, uri);
                 startActivityForResult(intent, Constants.REQUEST_CODE_CAPTURE);
